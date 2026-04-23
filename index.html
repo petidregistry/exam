@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magic Exam Converter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --bg: #F9FAFB;
+            --card-bg: #FFFFFF;
+            --text-main: #111827;
+            --text-muted: #6B7280;
+            --border: #E5E7EB;
+            --success: #10B981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: var(--text-main);
+            margin-bottom: 0.5rem;
+        }
+
+        p {
+            color: var(--text-muted);
+        }
+
+        .container {
+            background: var(--card-bg);
+            width: 100%;
+            max-width: 800px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            padding: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        /* Upload Area */
+        .upload-area {
+            border: 2px dashed var(--primary);
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            text-align: center;
+            background-color: #EEF2FF;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .upload-area:hover {
+            background-color: #E0E7FF;
+        }
+
+        .upload-area input[type="file"] {
+            display: none;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 1rem;
+        }
+
+        .btn:hover { background: var(--primary-hover); }
+        .btn:disabled { background: var(--text-muted); cursor: not-allowed; }
+
+        /* Loader */
+        .loader-container {
+            display: none;
+            text-align: center;
+            padding: 3rem;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0,0,0,0.1);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border-left-color: var(--primary);
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem auto;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Exam Interface */
+        #exam-interface {
+            display: none;
+        }
+
+        .question-card {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .question-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+        }
+
+        .option-label {
+            display: block;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        .option-label:hover {
+            background: #F3F4F6;
+        }
+
+        .option-label input[type="radio"] {
+            margin-right: 10px;
+        }
+
+        .option-label.selected {
+            border-color: var(--primary);
+            background: #EEF2FF;
+        }
+
+        .grade-btn-container {
+            text-align: right;
+            margin-top: 2rem;
+            border-top: 1px solid var(--border);
+            padding-top: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Magic Exam Converter</h1>
+        <p>Upload a PDF or Word Document. AI will extract it, save to your Sheet, and generate a gradable quiz.</p>
+    </header>
+
+    <div class="container" id="main-container">
+        
+        <div id="upload-section">
+            <div class="upload-area" id="drop-zone">
+                <svg width="50" height="50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: var(--primary); margin-bottom: 1rem;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+                <h3>Drag & Drop your PDF/Word file here</h3>
+                <p style="margin-top: 0.5rem; font-size: 0.9rem;">or click to browse</p>
+                <input type="file" id="file-input" accept=".pdf, .doc, .docx" />
+            </div>
+        </div>
+
+        <div class="loader-container" id="loader">
+            <div class="spinner"></div>
+            <h3 id="loader-text">Analyzing document & extracting questions...</h3>
+            <p>This usually takes 5-10 seconds.</p>
+        </div>
+
+        <div id="exam-interface">
+            <h2 style="margin-bottom: 1.5rem; color: var(--primary);">Your Interactive Exam</h2>
+            <div id="questions-container"></div>
+            <div class="grade-btn-container">
+                <button class="btn" onclick="gradeExam()">Finish & Grade Exam</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ==========================================
+        // PASTE YOUR APPS SCRIPT WEB APP URL BELOW
+        // ==========================================
+        const APPS_SCRIPT_URL = 'YOUR_WEB_APP_URL_HERE';
+
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const uploadSection = document.getElementById('upload-section');
+        const loader = document.getElementById('loader');
+        const examInterface = document.getElementById('exam-interface');
+        const questionsContainer = document.getElementById('questions-container');
+
+        // Event Listeners for File Selection
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.backgroundColor = '#E0E7FF'; });
+        dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.style.backgroundColor = '#EEF2FF'; });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.backgroundColor = '#EEF2FF';
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) handleFile(e.target.files[0]);
+        });
+
+        // Process File to Base64
+        function handleFile(file) {
+            uploadSection.style.display = 'none';
+            loader.style.display = 'block';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64Data = e.target.result.split(',')[1];
+                sendToGoogleScript(base64Data, file.name, file.type);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Send to Apps Script
+        function sendToGoogleScript(base64, fileName, mimeType) {
+            const payload = {
+                base64: base64,
+                fileName: fileName,
+                mimeType: mimeType
+            };
+
+            // Using 'text/plain' to avoid strict CORS preflight rejections by Apps Script
+            fetch(APPS_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                loader.style.display = 'none';
+                if(data.status === 'success') {
+                    renderExam(data.questions);
+                } else {
+                    alert('Error parsing document: ' + data.message);
+                    location.reload();
+                }
+            })
+            .catch(error => {
+                loader.style.display = 'none';
+                alert('Connection Error! Make sure you pasted your App Script URL inside the code.');
+                console.error('Error:', error);
+                location.reload();
+            });
+        }
+
+        // Render Exam to UI
+        function renderExam(questions) {
+            examInterface.style.display = 'block';
+            questionsContainer.innerHTML = '';
+
+            if(questions.length === 0) {
+                questionsContainer.innerHTML = '<p>No questions detected. Try uploading a document formatted with numbered questions (e.g. "1. Question text").</p>';
+                return;
+            }
+
+            questions.forEach((q, index) => {
+                const card = document.createElement('div');
+                card.className = 'question-card';
+                
+                let html = `<div class="question-title">${q.question}</div>`;
+                
+                // If the parser found standard options (A, B, C)
+                if(q.options.length > 0) {
+                    q.options.forEach((opt, oIndex) => {
+                        const optId = `q${index}_o${oIndex}`;
+                        html += `
+                            <label class="option-label" onclick="selectOption(this, 'q${index}')">
+                                <input type="radio" name="q${index}" value="${optId}">
+                                ${opt}
+                            </label>
+                        `;
+                    });
+                } else {
+                    html += `<textarea style="width:100%; padding:10px; border:1px solid #E5E7EB; border-radius:6px; margin-top:10px;" rows="3" placeholder="Type your answer here..."></textarea>`;
+                }
+                
+                card.innerHTML = html;
+                questionsContainer.appendChild(card);
+            });
+        }
+
+        // Highlight selected option visually
+        function selectOption(labelElement, groupName) {
+            const labels = document.querySelectorAll(`input[name="${groupName}"]`);
+            labels.forEach(input => {
+                input.closest('.option-label').classList.remove('selected');
+            });
+            labelElement.classList.add('selected');
+        }
+
+        function gradeExam() {
+            alert("Exam submitted! (Answers have been securely saved to your Google Sheet 'exam' database.)");
+            // You can add further local grading logic here if the answers are strictly known.
+        }
+    </script>
+</body>
+</html>

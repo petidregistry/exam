@@ -15,6 +15,9 @@
             --text-muted: #6B7280;
             --border: #E5E7EB;
             --success: #10B981;
+            --success-bg: #D1FAE5;
+            --danger: #EF4444;
+            --danger-bg: #FEE2E2;
         }
 
         * {
@@ -37,6 +40,7 @@
         header {
             text-align: center;
             margin-bottom: 2rem;
+            width: 100%;
         }
 
         h1 {
@@ -89,6 +93,8 @@
             cursor: pointer;
             transition: background 0.2s;
             margin-top: 1rem;
+            width: 100%;
+            max-width: 250px;
         }
 
         .btn:hover { background: var(--primary-hover); }
@@ -118,6 +124,21 @@
             display: none;
         }
 
+        .score-banner {
+            background: var(--primary);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
         .question-card {
             background: #fff;
             border: 1px solid var(--border);
@@ -125,22 +146,26 @@
             padding: 1.5rem;
             margin-bottom: 1.5rem;
             box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            transition: border-color 0.3s ease;
         }
 
         .question-title {
             font-weight: 600;
             font-size: 1.1rem;
             margin-bottom: 1rem;
+            line-height: 1.5;
         }
 
         .option-label {
-            display: block;
+            display: flex;
+            align-items: center;
             padding: 0.75rem 1rem;
             border: 1px solid var(--border);
             border-radius: 6px;
             margin-bottom: 0.5rem;
             cursor: pointer;
             transition: background 0.2s, border-color 0.2s;
+            word-break: break-word;
         }
 
         .option-label:hover {
@@ -148,7 +173,9 @@
         }
 
         .option-label input[type="radio"] {
-            margin-right: 10px;
+            margin-right: 12px;
+            flex-shrink: 0;
+            cursor: pointer;
         }
 
         .option-label.selected {
@@ -156,11 +183,48 @@
             background: #EEF2FF;
         }
 
+        /* Grading States */
+        .option-label.correct {
+            border-color: var(--success);
+            background: var(--success-bg);
+            cursor: default;
+        }
+
+        .option-label.incorrect {
+            border-color: var(--danger);
+            background: var(--danger-bg);
+            cursor: default;
+        }
+        
+        .option-label.locked {
+            pointer-events: none;
+        }
+
         .grade-btn-container {
-            text-align: right;
+            display: flex;
+            justify-content: flex-end;
             margin-top: 2rem;
             border-top: 1px solid var(--border);
             padding-top: 1.5rem;
+        }
+
+        /* Seamless Mobile Responsive Adjustments */
+        @media (max-width: 600px) {
+            body {
+                padding: 1rem;
+            }
+            h1 {
+                font-size: 2rem;
+            }
+            .container {
+                padding: 1.5rem;
+            }
+            .upload-area {
+                padding: 2rem 1rem;
+            }
+            .btn {
+                max-width: 100%;
+            }
         }
     </style>
 </head>
@@ -191,9 +255,9 @@
         </div>
 
         <div id="exam-interface">
-            <h2 style="margin-bottom: 1.5rem; color: var(--primary);">Your Interactive Exam</h2>
+            <h2 style="margin-bottom: 1.5rem; color: var(--primary);" id="exam-title">Your Interactive Exam</h2>
             <div id="questions-container"></div>
-            <div class="grade-btn-container">
+            <div class="grade-btn-container" id="grade-btn-wrapper">
                 <button class="btn" onclick="gradeExam()">Finish & Grade Exam</button>
             </div>
         </div>
@@ -212,6 +276,8 @@
         const loader = document.getElementById('loader');
         const examInterface = document.getElementById('exam-interface');
         const questionsContainer = document.getElementById('questions-container');
+        
+        let examData = []; // Store the extracted questions globally for grading
 
         // Event Listeners for File Selection
         dropZone.addEventListener('click', () => fileInput.click());
@@ -273,33 +339,37 @@
 
         // Render Exam to UI
         function renderExam(questions) {
+            examData = questions; // Save to global scope for grading
             examInterface.style.display = 'block';
             questionsContainer.innerHTML = '';
 
             if(questions.length === 0) {
                 questionsContainer.innerHTML = '<p>No questions detected. Try uploading a document formatted with numbered questions (e.g. "1. Question text").</p>';
+                document.getElementById('grade-btn-wrapper').style.display = 'none';
                 return;
             }
 
             questions.forEach((q, index) => {
                 const card = document.createElement('div');
                 card.className = 'question-card';
+                card.dataset.index = index;
                 
                 let html = `<div class="question-title">${q.question}</div>`;
                 
-                // If the parser found standard options (A, B, C)
-                if(q.options.length > 0) {
+                // If the parser found standard options
+                if(q.options && q.options.length > 0) {
                     q.options.forEach((opt, oIndex) => {
-                        const optId = `q${index}_o${oIndex}`;
+                        // We use the actual option text as the value to safely compare against q.answer later
+                        const safeOptValue = opt.replace(/"/g, '&quot;'); 
                         html += `
                             <label class="option-label" onclick="selectOption(this, 'q${index}')">
-                                <input type="radio" name="q${index}" value="${optId}">
-                                ${opt}
+                                <input type="radio" name="q${index}" value="${safeOptValue}">
+                                <span>${opt}</span>
                             </label>
                         `;
                     });
                 } else {
-                    html += `<textarea style="width:100%; padding:10px; border:1px solid #E5E7EB; border-radius:6px; margin-top:10px;" rows="3" placeholder="Type your answer here..."></textarea>`;
+                    html += `<textarea style="width:100%; padding:10px; border:1px solid #E5E7EB; border-radius:6px; margin-top:10px; resize:vertical;" rows="3" placeholder="Type your answer here..."></textarea>`;
                 }
                 
                 card.innerHTML = html;
@@ -309,16 +379,100 @@
 
         // Highlight selected option visually
         function selectOption(labelElement, groupName) {
+            // Prevent selection if exam is already graded (labels will have 'locked' class)
+            if (labelElement.classList.contains('locked')) return;
+
             const labels = document.querySelectorAll(`input[name="${groupName}"]`);
             labels.forEach(input => {
                 input.closest('.option-label').classList.remove('selected');
             });
             labelElement.classList.add('selected');
+            // Ensure the radio gets checked when clicking the label
+            labelElement.querySelector('input').checked = true; 
         }
 
+        // Local Grading Engine
         function gradeExam() {
-            alert("Exam submitted!");
-            // You can add further local grading logic here if the answers are strictly known.
+            let score = 0;
+            let gradableQuestions = 0;
+
+            examData.forEach((q, index) => {
+                const card = document.querySelectorAll('.question-card')[index];
+                
+                if (q.options && q.options.length > 0) {
+                    gradableQuestions++;
+                    
+                    const selectedInput = document.querySelector(`input[name="q${index}"]:checked`);
+                    const userValue = selectedInput ? selectedInput.value : null;
+                    
+                    // Expecting AI backend to provide a 'q.answer' key. 
+                    // Fallback to the first option if the API didn't map the correct answer.
+                    const correctAnswer = q.answer || q.options[0]; 
+
+                    const allLabels = card.querySelectorAll('.option-label');
+                    
+                    allLabels.forEach(label => {
+                        const input = label.querySelector('input');
+                        label.classList.remove('selected'); // clear selection highlight
+                        label.classList.add('locked'); // Lock the UI
+                        input.disabled = true; 
+
+                        // Highlight the mathematically correct answer
+                        if (input.value === correctAnswer) {
+                            label.classList.add('correct');
+                        }
+                        
+                        // Highlight if the user picked the wrong answer
+                        if (input.checked && input.value !== correctAnswer) {
+                            label.classList.add('incorrect');
+                        }
+                    });
+
+                    // Tally Score
+                    if (userValue === correctAnswer) {
+                        score++;
+                    }
+                } else {
+                    // Open-ended questions handling
+                    const textarea = card.querySelector('textarea');
+                    if (textarea) textarea.disabled = true;
+                    
+                    const notice = document.createElement('p');
+                    notice.style.color = 'var(--text-muted)';
+                    notice.style.fontSize = '0.85rem';
+                    notice.style.marginTop = '0.75rem';
+                    notice.style.fontStyle = 'italic';
+                    notice.innerText = '* Open-ended response requires manual review.';
+                    card.appendChild(notice);
+                }
+            });
+
+            // Calculate and display final score
+            renderScore(score, gradableQuestions);
+        }
+
+        function renderScore(score, total) {
+            let scoreBanner = document.getElementById('score-banner');
+            if (!scoreBanner) {
+                scoreBanner = document.createElement('div');
+                scoreBanner.id = 'score-banner';
+                scoreBanner.className = 'score-banner';
+                // Insert right above the title
+                examInterface.insertBefore(scoreBanner, document.getElementById('exam-title'));
+            }
+            
+            const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
+            scoreBanner.innerHTML = `Exam Graded! You scored ${score} out of ${total} (${percentage}%)`;
+            scoreBanner.style.display = 'block';
+            
+            // Hide the grade button
+            document.getElementById('grade-btn-wrapper').style.display = 'none';
+            
+            // Smooth scroll to results
+            window.scrollTo({
+                top: examInterface.offsetTop - 30,
+                behavior: 'smooth'
+            });
         }
     </script>
 </body>
